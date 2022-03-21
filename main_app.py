@@ -8,6 +8,7 @@ app.config['MYSQL_DATABASE_USER'] = 'sagar24'
 app.config['MYSQL_DATABASE_PASSWORD'] = 'NBRoot@00'
 app.config['MYSQL_DATABASE_DB'] = 'sagar24$bookstore'
 app.config['MYSQL_DATABASE_HOST'] = 'sagar24.mysql.pythonanywhere-services.com'
+mysql.init_app(app)
 
 
 @app.route("/get_books", methods=['POST'])
@@ -20,31 +21,33 @@ def get_books():
         with mysql.connect() as conn:
             cursor = conn.cursor()
             cursor.execute(query)
+            # print('total rows :',cursor.rowcount)
+            row_headers = [x[0] for x in cursor.description]
 
-            def generate_rows(db_cursor):
-                books = []
-                row_headers = [x[0] for x in cursor.description]
-
+            def generate_rows():
                 while cursor.rownumber < cursor.rowcount:
                     rows = cursor.fetchmany(25)
-                    if len(rows):
-                        for row in rows:
-                            json_row = dict(zip(row_headers, row))
-                            json_row['genre'] = json_row['bookshelf']
-                            books.append(json_row)
-
-                        yield json.dumps({"count" : db_cursor.rowcount, "books":books})
-                    else:
-                        return jsonify({"count": 0, "books": 'No record found'})
+                    books = data_to_json(rows, row_headers)
+                    yield json.dumps({"count" : len(rows), "books":books})
 
             if cursor.rowcount > 25:
-                return Response(stream_with_context(generate_rows(cursor)), mimetype='application/json')
+                return Response(stream_with_context(generate_rows()), mimetype='application/json')
             else:
-                return jsonify({"count" : cursor.rowcount, "books":cursor.fetchall()})
+                rows = cursor.fetchall()
+                books = data_to_json(rows, row_headers)
+                return jsonify({"count" : len(rows), "books":books})
 
     except Exception as exp:
         print(exp)
 
+
+def data_to_json(rows, row_headers):
+    books = []
+    for row in rows:
+        json_row = dict(zip(row_headers, row))
+        json_row['genre'] = json_row['bookshelf']
+        books.append(json_row)
+    return books
 
 def create_query(query_payload):
     query = f"SELECT books_book.title as title, books_author.name as author_name, books_author.birth_year as birth_year, books_author.death_year as death_year, books_bookshelf.name as bookshelf, books_language.code as language_code, books_subject.name as subject, books_format.url as download_url" \
