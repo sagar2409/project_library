@@ -8,7 +8,6 @@ app.config['MYSQL_DATABASE_USER'] = 'sagar24'
 app.config['MYSQL_DATABASE_PASSWORD'] = 'NBRoot@00'
 app.config['MYSQL_DATABASE_DB'] = 'sagar24$bookstore'
 app.config['MYSQL_DATABASE_HOST'] = 'sagar24.mysql.pythonanywhere-services.com'
-mysql.init_app(app)
 
 
 @app.route("/get_books", methods=['POST'])
@@ -25,16 +24,18 @@ def get_books():
             def generate_rows(db_cursor):
                 books = []
                 row_headers = [x[0] for x in cursor.description]
-                rows = cursor.fetchmany(25)
-                if len(rows):
-                    for row in rows:
-                        json_row = dict(zip(row_headers, row))
-                        json_row['genre'] = json_row['bookshelf']
-                        books.append(json_row)
 
-                    yield json.dumps({"count" : db_cursor.rowcount, "books":books})
-                else:
-                    return jsonify({"count": 0, "books": 'No record found'})
+                while cursor.rownumber < cursor.rowcount:
+                    rows = cursor.fetchmany(25)
+                    if len(rows):
+                        for row in rows:
+                            json_row = dict(zip(row_headers, row))
+                            json_row['genre'] = json_row['bookshelf']
+                            books.append(json_row)
+
+                        yield json.dumps({"count" : db_cursor.rowcount, "books":books})
+                    else:
+                        return jsonify({"count": 0, "books": 'No record found'})
 
             if cursor.rowcount > 25:
                 return Response(stream_with_context(generate_rows(cursor)), mimetype='application/json')
